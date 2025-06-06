@@ -1,222 +1,177 @@
+// Define el pipeline con la sintaxis declarativa.
 pipeline {
+    // Especifica dónde se ejecutará el pipeline.
     agent any
 
+    // Define variables de entorno que se usarán a lo largo del pipeline.
+    // ¡Asegúrate de ajustar estos valores a tu configuración específica!
     environment {
-        APP_NAME = 'my-react-app'
-        CONTAINER_PORT = '80'
-        HOST_PORT = '8081'
+        APP_NAME = 'react'                  // <--- ¡AJUSTA! Nombre de tu aplicación (ej: 'react', 'mi_app')
+        CONTAINER_PORT = '80'               // <--- ¡AJUSTA! Puerto interno del contenedor Docker de tu app
+        HOST_PORT = '8081'                  // <--- ¡AJUSTA! Puerto del servidor host que se mapeará al CONTAINER_PORT
+                                            //        (ej: si accedes a tu app por http://tu_servidor:8081)
+
+        # Variables para la conexión SSH remota (a través del plugin Publish Over SSH)
+        SSH_SERVER_NAME = 'saserver'        // <--- ¡AJUSTA! Nombre del servidor configurado en Publish over SSH
+        DEPLOY_USER = 'satest'              // <--- ¡AJUSTA! El usuario en el servidor remoto que tiene acceso a Docker
+
+        # Path de la aplicación en el servidor remoto. Será '/APP_NAME'
+        REMOTE_APP_DIR = "/${APP_NAME}"     // <--- ¡AJUSTA SI QUIERES OTRA RUTA BASE QUE NO SEA LA RAÍZ!
+                                            //        Ej: '/apps/react' si prefieres.
     }
 
+    // Define las etapas (stages) del pipeline.
     stages {
-        stage('Checkout Code') {
+        stage('Checkout Code (Jenkins Local)') {
             steps {
-                echo "Clonando el repositorio Git..."
+                echo "Clonando el repositorio Git en el workspace de Jenkins (estándar). Este código se enviará al servidor remoto."
+                // Jenkins automáticamente clona el repositorio al inicio del job.
+                // Este paso asegura que tengamos el código fuente en el workspace de Jenkins.
             }
         }
 
-        stage('Build Docker Image Locally on Host') {
+        stage('Prepare Remote Environment and Copy Code') {
             steps {
                 script {
-                    echo "Construyendo la imagen Docker '${APP_NAME}:latest' en el host usando Docker Pipeline plugin..."
-                    // Usa docker.build() del plugin Docker Pipeline.
-                    // El 'docker' aquí se refiere al objeto global de Docker inyectado por el plugin.
-                    // El '.' como segundo argumento indica el contexto de construcción (directorio actual).
-                    docker.build("${APP_NAME}:latest", ".")
+                    echo "Preparando directorio remoto '${env.REMOTE_APP_DIR}' y copiando código a '${env.SSH_SERVER_NAME}'..."
+                    sshPublisher(publishers: [
+                        sshPublisherDesc(
+                            configName: env.SSH_SERVER_NAME,
+                            transfers: [
+                                # Paso 1: Limpiar y crear el directorio remoto
+                                sshTransfer(
+                                    execCommand: """
+                                        echo "--- Limpiando y creando directorio de la aplicación en el remoto ---"
+                                        # Eliminar el directorio si ya existe para asegurar una copia limpia
+                                        sudo -u satest rm -rf ${env.REMOTE_APP_DIR} || true
+                                        # Crear el nuevo directorio
+                                        sudo -u satest mkdir -p ${env.REMOTE_APP_DIR}
+                                        # Asegurar que el usuario de despliegue (satest) sea el propietario y tenga permisos
+                                        sudo -u satest chown ${env.DEPLOY_USER}:${env.DEPLOY_USER} ${env.REMOTE_APP_DIR}
+                                        sudo -u satest chmod 755 ${env.REMOTE_APP_DIR}
+                                        echo "Directorio remoto '${env.REMOTE_APP_DIR}' preparado."
+                                    """
+                                ),
+                                # Paso 2: Copiar el código desde el workspace de Jenkins al servidor remoto
+                                sshTransfer(
+                                    sourceFiles: '**',          // Copia todos los archivos y directorios del workspace de Jenkins
+                                    removePrefix: '.',          // Elimina el prefijo '.' para que no cree un '.'-directorio
+                                    remoteDirectory: env.REMOTE_APP_DIR, // El directorio de destino en el servidor remoto
+                                    execCommand: """
+                                        echo "--- Código copiado al servidor remoto ---"
+                                        # El 'execCommand' se ejecuta DESPUÉS de la transferencia de archivos
+                                        # Puedes usarlo para verificar que los archivos están allí, si quieres
+                                        sudo -u satest ls -la ${env.REMOTE_APP_DIR}
+                                        echo "--- Fin de la copia de código ---"
+                                    """
+                                )
+                            ]
+                        )
+                    ])
+                    echo "Código copiado exitosamente a '${env.REMOTE_APP_DIR}' en el servidor remoto."
                 }
             }
         }
 
-        stage('Stop and Remove Old Container') {
-            steps {
-                script {
-                    echo "Deteniendo y eliminando el contenedor antiguo si existe..."
-                    // Aquí todavía podríamos usar 'sh' si no hay un paso de Docker Pipeline
-                    // directo para detener/eliminar contenedores por nombre,
-                    // o podríamos intentar con el objeto 'docker' si lo permite.
-                    // Para simplificar, y dado que la API de Docker sí soporta estas operaciones,
-                    // podemos usar 'sh' si docker-cli está disponible (que es lo que intentamos evitar)
-                    // o implementar una lógica más avanzada con las librerías.
-                    // Para este caso, el plugin Docker Pipeline a menudo maneja esto indirectamente
-                    // cuando lanzas un nuevo contenedor (matando el viejo).
-                    // Sin embargo, para un control explícito de 'stop' y 'rm', a menudo se requiere el CLI
-                    // o una interacción más directa con el API.
-                    // Por ahora, para evitar el 'docker: not found', vamos a simularlo
-                    // o asumir que la creación de un nuevo contenedor manejará el reemplazo.
+        # stage('Build Docker Image on Remote Server') {
+        #     steps {
+        #         script {
+        #             echo "Construyendo la imagen Docker '${env.APP_NAME}:latest' en el servidor remoto '${env.SSH_SERVER_NAME}' como usuario '${env.DEPLOY_USER}'..."
+        #             sshPublisher(publishers: [
+        #                 sshPublisherDesc(
+        #                     configName: env.SSH_SERVER_NAME,
+        #                     transfers: [
+        #                         sshTransfer(
+        #                             execCommand: """
+        #                                 echo "--- Inicio de construcción de imagen Docker ---"
+        #                                 # Cambiar al directorio donde se copió tu Dockerfile y el código fuente
+        #                                 cd ${env.REMOTE_APP_DIR} || exit 1 # Sale si no puede cambiar de directorio
+                                        
+        #                                 # Ejecutar docker build como el usuario con acceso a Docker
+        #                                 sudo -u ${env.DEPLOY_USER} docker build -t ${env.APP_NAME}:latest .
+        #                                 echo "--- Fin de construcción de imagen Docker ---"
+        #                             """
+        #                         )
+        #                     ]
+        #                 )
+        #             ])
+        #             echo "Imagen Docker '${env.APP_NAME}:latest' construida en el servidor remoto."
+        #         }
+        #     }
+        # }
 
-                    // Si el objetivo es NO tener 'docker-cli' en Jenkins,
-                    // esta parte es donde el plugin Docker Pipeline podría ser limitado
-                    // para 'stop' y 'rm' por nombre *explícitamente*.
-                    // Normalmente, cuando haces un 'docker run' con un nombre existente,
-                    // ya te da un error. Para manejarlo sin CLI:
+        # stage('Deploy Docker Container on Remote Server') {
+        #     steps {
+        #         script {
+        #             echo "Desplegando el contenedor Docker '${env.APP_NAME}-container' en el servidor remoto '${env.SSH_SERVER_NAME}' como usuario '${env.DEPLOY_USER}'..."
+        #             sshPublisher(publishers: [
+        #                 sshPublisherDesc(
+        #                     configName: env.SSH_SERVER_NAME,
+        #                     transfers: [
+        #                         sshTransfer(
+        #                             execCommand: """
+        #                                 echo "--- Inicio de despliegue de contenedor ---"
+        #                                 # Detener y eliminar el contenedor antiguo si existe (|| true evita que el script falle)
+        #                                 echo "Intentando detener contenedor antiguo '${APP_NAME}-container'..."
+        #                                 sudo -u ${env.DEPLOY_USER} docker stop ${APP_NAME}-container || true
+        #                                 echo "Intentando eliminar contenedor antiguo '${APP_NAME}-container'..."
+        #                                 sudo -u ${env.DEPLOY_USER} docker rm ${APP_NAME}-container || true
+                                        
+        #                                 # Lanzar el nuevo contenedor con la imagen recién construida
+        #                                 echo "Lanzando nuevo contenedor '${APP_NAME}-container'..."
+        #                                 sudo -u ${env.DEPLOY_USER} docker run -d --name ${APP_NAME}-container -p ${HOST_PORT}:${CONTAINER_PORT} ${APP_NAME}:latest
+        #                                 echo "--- Contenedor nuevo levantado ---"
+                                        
+        #                                 # Opcional: Pausa breve para que el contenedor inicie y muestre los últimos logs
+        #                                 # echo "Esperando 5 segundos para que el contenedor inicie completamente..."
+        #                                 # sleep 5
+        #                                 # echo "Últimos logs del contenedor '${APP_NAME}-container':"
+        #                                 # sudo -u ${env.DEPLOY_USER} docker logs ${APP_NAME}-container --tail 10
+        #                             """
+        #                         )
+        #                     ]
+        #                 )
+        #             ])
+        #             echo "Contenedor '${APP_NAME}-container' desplegado en el servidor remoto."
+        #         }
+        #     }
+        # }
 
-                    // Una forma más "plugin-friendly" para asegurar que un contenedor no esté corriendo
-                    // antes de lanzar el nuevo sería mediante el uso de "Docker Cloud" o una
-                    // configuración de agente Docker más avanzada.
-                    // PERO, para tu caso de despliegue simple, podríamos simplemente intentar lanzar
-                    // y si falla porque ya existe el nombre, revisar logs.
-                    // O, si queremos limpieza, se requeriría el CLI o una integración API más profunda.
-
-                    // POR AHORA, para avanzar y evitar el "docker: not found" en 'docker build':
-                    // Mantendremos esta etapa pero con un 'echo' y la nota.
-                    // Si el problema persiste aquí, es un tema de cómo el plugin maneja 'run' sobre existentes.
-                    echo "Asumiendo que el lanzamiento del nuevo contenedor gestionará el reemplazo."
-                    echo "Si el contenedor ya existe y esto falla, considera añadir un agente Docker con CLI."
-                }
-            }
-        }
-
-        stage('Run New Container') {
-            steps {
-                script {
-                    echo "Levantando el nuevo contenedor '${APP_NAME}-container' con Docker Pipeline plugin..."
-                    def customImage = docker.image("${APP_NAME}:latest")
-                    customImage.run("-d --name ${APP_NAME}-container -p ${HOST_PORT}:${CONTAINER_PORT}")
-                    // El plugin se encargará de levantar el contenedor.
-                    // En algunos casos, si un contenedor con el mismo nombre ya existe,
-                    // este paso fallaría. Para un reemplazo robusto sin CLI en Jenkins,
-                    // usualmente se usa un enfoque de orquestación (Docker Swarm, Kubernetes)
-                    // o un agente Jenkins con Docker CLI.
-                }
-            }
-        }
-
-        stage('Post-Deployment Verification (Optional)') {
-            steps {
-                script {
-                    echo "Realizando una verificación post-despliegue..."
-                    // Si necesitas 'curl' o 'wget' aquí para verificar tu app,
-                    // recuerda que esos comandos tampoco estarían en el contenedor Jenkins por defecto.
-                    // Podrías instalarlos temporalmente en un 'sh' o usar un paso Groovy diferente.
-                    echo "Verificación simple completada. Considere añadir una prueba más robusta."
-                }
-            }
-        }
+        # stage('Post-Deployment Verification (Optional)') {
+        #     steps {
+        #         script {
+        #             echo "Realizando una verificación post-despliegue en el servidor remoto..."
+        #             sshPublisher(publishers: [
+        #                 sshPublisherDesc(
+        #                     configName: env.SSH_SERVER_NAME,
+        #                     transfers: [
+        #                         sshTransfer(
+        #                             execCommand: """
+        #                                 echo "--- Verificación de contenedor corriendo ---"
+        #                                 # Muestra el estado del contenedor recién desplegado
+        #                                 sudo -u ${env.DEPLOY_USER} docker ps -f "name=${APP_NAME}-container"
+        #                                 echo "--- Fin verificación ---"
+        #                             """
+        #                         )
+        #                     ]
+        #                 )
+        #             ])
+        #             echo "Verificación simple completada. Revisa la consola para el estado del contenedor."
+        #         }
+        #     }
+        # }
     }
 
+    // Bloque 'post' para definir acciones que se ejecutarán al finalizar el pipeline.
     post {
         always {
-            echo "Pipeline finalizado. Revisa la 'Console Output' para más detalles."
+            echo "Pipeline de despliegue finalizado. Revisa la 'Console Output' para todos los detalles del proceso."
         }
         success {
-            echo "¡Despliegue de '${APP_NAME}' exitoso! 🎉 La aplicación debería estar accesible en el puerto ${HOST_PORT}."
+            echo "¡Despliegue de '${env.APP_NAME}' exitoso! 🎉 La aplicación debería estar accesible en tu servidor remoto en el puerto ${env.HOST_PORT}."
         }
         failure {
-            echo "¡Despliegue de '${APP_NAME}' fallido! 🔴 Hubo errores en el pipeline. Revisa la 'Console Output' cuidadosamente."
+            echo "¡Despliegue de '${env.APP_NAME}' fallido! 🔴 Hubo errores en el pipeline. Revisa la 'Console Output' cuidadosamente para depurar."
         }
     }
 }
-
-
-// // Define el pipeline con la sintaxis declarativa.
-// pipeline {
-//     // Especifica dónde se ejecutará el pipeline.
-//     // 'agent any' significa que se ejecutará en cualquier agente de Jenkins disponible.
-//     // Dado que tu contenedor Jenkins está en el mismo host que tus otros contenedores,
-//     // este agente utilizará el socket de Docker del host.
-//     agent any
-
-//     // Define variables de entorno que se usarán a lo largo del pipeline.
-//     // Esto centraliza la configuración y hace el script más legible y fácil de mantener.
-//     environment {
-//         // Nombre de tu aplicación. Se usará para nombrar la imagen Docker y el contenedor.
-//         APP_NAME = 'my-react-app' // <--- ¡AJUSTA ESTO a un nombre descriptivo para tu app!
-
-//         // Puerto interno que tu aplicación React (a través de Nginx) expone dentro del contenedor.
-//         // Para la configuración de Nginx que te di, este debe ser 80.
-//         CONTAINER_PORT = '80'
-
-//         // Puerto en el host (tu servidor) donde la aplicación será accesible.
-//         // Elige un puerto disponible en tu servidor (ej. 3000, 8080, 8081, etc.).
-//         HOST_PORT = '80'
-//     }
-
-//     // Define las etapas (stages) del pipeline. Cada etapa representa un paso lógico.
-//     stages {
-//         stage('Checkout Code') {
-//             // Esta etapa clona el código del repositorio.
-//             // Jenkins lo hace automáticamente al inicio del pipeline si está configurado con SCM,
-//             // pero esta etapa explícita es útil para verla en la interfaz de Jenkins y confirmar.
-//             steps {
-//                 echo "Clonando el repositorio Git..."
-//                 // Puedes añadir pasos de verificación de código aquí si es necesario.
-//             }
-//         }
-
-//         stage('Build Docker Image Locally on Host') {
-//             // Esta etapa construye la imagen Docker de tu aplicación React.
-//             // Utiliza el Dockerfile y nginx.conf que has colocado en la raíz de tu repo.
-//             steps {
-//                 script {
-//                     echo "Construyendo la imagen Docker '${APP_NAME}:latest' en el host..."
-//                     // El comando `docker build` se ejecuta en el host Docker
-//                     // a través del socket montado en el contenedor de Jenkins.
-//                     // El '.' indica que el contexto de construcción es el directorio de trabajo actual
-//                     // (donde Jenkins clonó tu repositorio y donde está tu Dockerfile).
-//                     sh "docker build -t ${APP_NAME}:latest ."
-//                 }
-//             }
-//         }
-
-//         stage('Stop and Remove Old Container') {
-//             // Esta etapa detiene y elimina el contenedor de la versión anterior de tu aplicación.
-//             // Esto es necesario para poder levantar un nuevo contenedor con la nueva imagen.
-//             steps {
-//                 script {
-//                     echo "Deteniendo y eliminando el contenedor antiguo si existe..."
-//                     // `docker stop` y `docker rm` se ejecutan en el host.
-//                     // `|| true` asegura que el pipeline no falle si el contenedor no existe
-//                     // (útil en el primer despliegue o si el contenedor ya fue eliminado).
-//                     sh "docker stop ${APP_NAME}-container || true"
-//                     sh "docker rm ${APP_NAME}-container || true"
-//                 }
-//             }
-//         }
-
-//         stage('Run New Container') {
-//             // Esta etapa inicia un nuevo contenedor Docker con la imagen recién construida.
-//             steps {
-//                 script {
-//                     echo "Levantando el nuevo contenedor '${APP_NAME}-container'..."
-//                     // `docker run`: Comando para crear y ejecutar un nuevo contenedor.
-//                     // -d: Ejecuta el contenedor en modo 'detached' (en segundo plano).
-//                     // --name ${APP_NAME}-container: Asigna un nombre específico al contenedor para fácil referencia.
-//                     // -p ${HOST_PORT}:${CONTAINER_PORT}: Mapea el puerto del host al puerto interno del contenedor.
-//                     //   Asegúrate de que HOST_PORT sea un puerto disponible en tu servidor.
-//                     //   CONTAINER_PORT debe ser '80' porque tu configuración de Nginx lo expone en el puerto 80.
-//                     // ${APP_NAME}:latest: La imagen Docker a utilizar para el nuevo contenedor.
-//                     sh "docker run -d --name ${APP_NAME}-container -p ${HOST_PORT}:${CONTAINER_PORT} ${APP_NAME}:latest"
-//                 }
-//             }
-//         }
-
-//         stage('Post-Deployment Verification (Optional)') {
-//             // Esta etapa es opcional pero altamente recomendada para verificar que la aplicación
-//             // se ha desplegado correctamente y está respondiendo.
-//             steps {
-//                 script {
-//                     echo "Realizando una verificación post-despliegue..."
-//                     // Puedes añadir un `curl` o `wget` para hacer una petición HTTP a un endpoint de tu aplicación.
-//                     // Por ejemplo, si tu app React tiene un endpoint de salud o simplemente la ruta raíz.
-//                     // sh "curl -f http://localhost:${HOST_PORT}/ || error 'La aplicación no responde después del despliegue!'"
-//                     echo "Verificación simple completada. Considera añadir una prueba más robusta."
-//                 }
-//             }
-//         }
-//     }
-
-//     // Bloque 'post' para definir acciones a ejecutar después de que todas las etapas hayan terminado,
-//     // independientemente del resultado (éxito o fallo).
-//     post {
-//         always {
-//             echo "Pipeline finalizado. Revisa la 'Console Output' para más detalles."
-//         }
-//         success {
-//             echo "¡Despliegue de '${APP_NAME}' exitoso! 🎉 La aplicación debería estar accesible en el puerto ${HOST_PORT}."
-//             // Aquí puedes añadir notificaciones para el equipo (ej. a Slack, correo electrónico).
-//         }
-//         failure {
-//             echo "¡Despliegue de '${APP_NAME}' fallido! 🔴 Hubo errores en el pipeline. Revisa la 'Console Output' cuidadosamente."
-//             // Aquí puedes añadir notificaciones de error a Slack, correo electrónico, etc.
-//         }
-//     }
-// }
