@@ -11,11 +11,11 @@ pipeline {
         HOST_PORT = '8081'                  // <--- ¡AJUSTA! Puerto del servidor host que se mapeará al CONTAINER_PORT
                                             //        (ej: si accedes a tu app por http://tu_servidor:8081)
 
-        # Variables para la conexión SSH remota (a través del plugin Publish Over SSH)
+        // Variables para la conexión SSH remota (a través del plugin Publish Over SSH)
         SSH_SERVER_NAME = 'saserver'        // <--- ¡AJUSTA! Nombre del servidor configurado en Publish over SSH
         DEPLOY_USER = 'satest'              // <--- ¡AJUSTA! El usuario en el servidor remoto que tiene acceso a Docker
 
-        # Path de la aplicación en el servidor remoto. Será '/APP_NAME'
+        // Path de la aplicación en el servidor remoto. Será '/APP_NAME'
         REMOTE_APP_DIR = "/${APP_NAME}"     // <--- ¡AJUSTA SI QUIERES OTRA RUTA BASE QUE NO SEA LA RAÍZ!
                                             //        Ej: '/apps/react' si prefieres.
     }
@@ -38,7 +38,7 @@ pipeline {
                         sshPublisherDesc(
                             configName: env.SSH_SERVER_NAME,
                             transfers: [
-                                # Paso 1: Limpiar y crear el directorio remoto
+                                // Paso 1: Limpiar y crear el directorio remoto
                                 sshTransfer(
                                     execCommand: """
                                         echo "--- Limpiando y creando directorio de la aplicación en el remoto ---"
@@ -52,7 +52,7 @@ pipeline {
                                         echo "Directorio remoto '${env.REMOTE_APP_DIR}' preparado."
                                     """
                                 ),
-                                # Paso 2: Copiar el código desde el workspace de Jenkins al servidor remoto
+                                // Paso 2: Copiar el código desde el workspace de Jenkins al servidor remoto
                                 sshTransfer(
                                     sourceFiles: '**',          // Copia todos los archivos y directorios del workspace de Jenkins
                                     removePrefix: '.',          // Elimina el prefijo '.' para que no cree un '.'-directorio
@@ -72,94 +72,6 @@ pipeline {
                 }
             }
         }
-
-        # stage('Build Docker Image on Remote Server') {
-        #     steps {
-        #         script {
-        #             echo "Construyendo la imagen Docker '${env.APP_NAME}:latest' en el servidor remoto '${env.SSH_SERVER_NAME}' como usuario '${env.DEPLOY_USER}'..."
-        #             sshPublisher(publishers: [
-        #                 sshPublisherDesc(
-        #                     configName: env.SSH_SERVER_NAME,
-        #                     transfers: [
-        #                         sshTransfer(
-        #                             execCommand: """
-        #                                 echo "--- Inicio de construcción de imagen Docker ---"
-        #                                 # Cambiar al directorio donde se copió tu Dockerfile y el código fuente
-        #                                 cd ${env.REMOTE_APP_DIR} || exit 1 # Sale si no puede cambiar de directorio
-                                        
-        #                                 # Ejecutar docker build como el usuario con acceso a Docker
-        #                                 sudo -u ${env.DEPLOY_USER} docker build -t ${env.APP_NAME}:latest .
-        #                                 echo "--- Fin de construcción de imagen Docker ---"
-        #                             """
-        #                         )
-        #                     ]
-        #                 )
-        #             ])
-        #             echo "Imagen Docker '${env.APP_NAME}:latest' construida en el servidor remoto."
-        #         }
-        #     }
-        # }
-
-        # stage('Deploy Docker Container on Remote Server') {
-        #     steps {
-        #         script {
-        #             echo "Desplegando el contenedor Docker '${env.APP_NAME}-container' en el servidor remoto '${env.SSH_SERVER_NAME}' como usuario '${env.DEPLOY_USER}'..."
-        #             sshPublisher(publishers: [
-        #                 sshPublisherDesc(
-        #                     configName: env.SSH_SERVER_NAME,
-        #                     transfers: [
-        #                         sshTransfer(
-        #                             execCommand: """
-        #                                 echo "--- Inicio de despliegue de contenedor ---"
-        #                                 # Detener y eliminar el contenedor antiguo si existe (|| true evita que el script falle)
-        #                                 echo "Intentando detener contenedor antiguo '${APP_NAME}-container'..."
-        #                                 sudo -u ${env.DEPLOY_USER} docker stop ${APP_NAME}-container || true
-        #                                 echo "Intentando eliminar contenedor antiguo '${APP_NAME}-container'..."
-        #                                 sudo -u ${env.DEPLOY_USER} docker rm ${APP_NAME}-container || true
-                                        
-        #                                 # Lanzar el nuevo contenedor con la imagen recién construida
-        #                                 echo "Lanzando nuevo contenedor '${APP_NAME}-container'..."
-        #                                 sudo -u ${env.DEPLOY_USER} docker run -d --name ${APP_NAME}-container -p ${HOST_PORT}:${CONTAINER_PORT} ${APP_NAME}:latest
-        #                                 echo "--- Contenedor nuevo levantado ---"
-                                        
-        #                                 # Opcional: Pausa breve para que el contenedor inicie y muestre los últimos logs
-        #                                 # echo "Esperando 5 segundos para que el contenedor inicie completamente..."
-        #                                 # sleep 5
-        #                                 # echo "Últimos logs del contenedor '${APP_NAME}-container':"
-        #                                 # sudo -u ${env.DEPLOY_USER} docker logs ${APP_NAME}-container --tail 10
-        #                             """
-        #                         )
-        #                     ]
-        #                 )
-        #             ])
-        #             echo "Contenedor '${APP_NAME}-container' desplegado en el servidor remoto."
-        #         }
-        #     }
-        # }
-
-        # stage('Post-Deployment Verification (Optional)') {
-        #     steps {
-        #         script {
-        #             echo "Realizando una verificación post-despliegue en el servidor remoto..."
-        #             sshPublisher(publishers: [
-        #                 sshPublisherDesc(
-        #                     configName: env.SSH_SERVER_NAME,
-        #                     transfers: [
-        #                         sshTransfer(
-        #                             execCommand: """
-        #                                 echo "--- Verificación de contenedor corriendo ---"
-        #                                 # Muestra el estado del contenedor recién desplegado
-        #                                 sudo -u ${env.DEPLOY_USER} docker ps -f "name=${APP_NAME}-container"
-        #                                 echo "--- Fin verificación ---"
-        #                             """
-        #                         )
-        #                     ]
-        #                 )
-        #             ])
-        #             echo "Verificación simple completada. Revisa la consola para el estado del contenedor."
-        #         }
-        #     }
-        # }
     }
 
     // Bloque 'post' para definir acciones que se ejecutarán al finalizar el pipeline.
