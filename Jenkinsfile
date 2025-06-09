@@ -16,7 +16,7 @@ pipeline {
         DEPLOY_USER = 'satest'              // <--- ¡AJUSTA! El usuario en el servidor remoto que tiene acceso a Docker
 
         // Path de la aplicación en el servidor remoto. Será '/APP_NAME'
-        REMOTE_APP_DIR = "/home/satest/${APP_NAME}"     // <--- ¡AJUSTA SI QUIERES OTRA RUTA BASE QUE NO SEA LA RAÍZ!
+        REMOTE_APP_DIR = "/${APP_NAME}"     // <--- ¡AJUSTA SI QUIERES OTRA RUTA BASE QUE NO SEA LA RAÍZ!
                                             //        Ej: '/apps/react' si prefieres.
     }
 
@@ -73,28 +73,28 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image on Remote Server') {
-            steps {
-                script {
-                    echo "Construyendo la imagen Docker '${env.APP_NAME}:latest' en el servidor remoto '${env.SSH_SERVER_NAME}' como usuario '${env.DEPLOY_USER}'..."
-                    sshPublisher(publishers: [
-                        sshPublisherDesc(
-                            configName: env.SSH_SERVER_NAME,
-                            transfers: [
-                                sshTransfer(
-                                    execCommand: """
-                                        echo "--- Inicio de construcción de imagen Docker ---"
-                                        sudo -u ${env.DEPLOY_USER} docker build -t ${env.APP_NAME}:latest -f ${env.REMOTE_APP_DIR}/Dockerfile ${env.REMOTE_APP_DIR}
-                                        echo "--- Fin de construcción de imagen Docker ---"
-                                    """
-                                )
-                            ]
-                        )
-                    ])
-                    echo "Imagen Docker '${env.APP_NAME}:latest' construida en el servidor remoto."
-                }
-            }
-        }
+        // stage('Build Docker Image on Remote Server') {
+        //     steps {
+        //         script {
+        //             echo "Construyendo la imagen Docker '${env.APP_NAME}:latest' en el servidor remoto '${env.SSH_SERVER_NAME}' como usuario '${env.DEPLOY_USER}'..."
+        //             sshPublisher(publishers: [
+        //                 sshPublisherDesc(
+        //                     configName: env.SSH_SERVER_NAME,
+        //                     transfers: [
+        //                         sshTransfer(
+        //                             execCommand: """
+        //                                 echo "--- Inicio de construcción de imagen Docker ---"
+        //                                 sudo -u ${env.DEPLOY_USER} docker build -t ${env.APP_NAME}:latest -f ${env.REMOTE_APP_DIR}/Dockerfile ${env.REMOTE_APP_DIR}
+        //                                 echo "--- Fin de construcción de imagen Docker ---"
+        //                             """
+        //                         )
+        //                     ]
+        //                 )
+        //             ])
+        //             echo "Imagen Docker '${env.APP_NAME}:latest' construida en el servidor remoto."
+        //         }
+        //     }
+        // }
     }
 
     // Bloque 'post' para definir acciones que se ejecutarán al finalizar el pipeline.
