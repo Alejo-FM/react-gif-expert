@@ -12,6 +12,9 @@ ARG HTTPS_PROXY
 ENV HTTP_PROXY=$HTTP_PROXY
 ENV HTTPS_PROXY=$HTTPS_PROXY
 
+RUN yarn config set proxy $HTTP_PROXY && \
+    yarn config set https-proxy $HTTPS_PROXY
+
 # Establece el directorio de trabajo dentro del contenedor.
 WORKDIR /app
 
