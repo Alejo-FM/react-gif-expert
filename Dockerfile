@@ -1,7 +1,7 @@
 # Stage 1: Build the React application
 # Utiliza una imagen Node.js ligera para la etapa de construcción.
 # Recomendamos una versión LTS de Alpine para imágenes más pequeñas.
-FROM node:20-alpine AS build-stage
+FROM node:18-alpine AS build-stage
 
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
