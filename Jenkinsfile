@@ -16,7 +16,7 @@ pipeline {
         DEPLOY_USER = 'satest'              // <--- ¡AJUSTA! El usuario en el servidor remoto que tiene acceso a Docker
 
         // Path de la aplicación en el servidor remoto. Será '/APP_NAME'
-        REMOTE_APP_DIR = "/home/satest/${APP_NAME}"     // <--- ¡AJUSTA SI QUIERES OTRA RUTA BASE QUE NO SEA LA RAÍZ!
+        REMOTE_APP_DIR = "/${APP_NAME}"     // <--- ¡AJUSTA SI QUIERES OTRA RUTA BASE QUE NO SEA LA RAÍZ!
                                             //        Ej: '/apps/react' si prefieres.
     }
 
@@ -30,49 +30,6 @@ pipeline {
             }
         }
 
-        // stage('Prepare Remote Environment and Copy Code') {
-        //     steps {
-        //         script {
-        //             echo "Preparando directorio remoto '${env.REMOTE_APP_DIR}' y copiando código a '${env.SSH_SERVER_NAME}'..."
-        //             sshPublisher(publishers: [
-        //                 sshPublisherDesc(
-        //                     configName: env.SSH_SERVER_NAME,
-        //                     transfers: [
-        //                         // Paso 1: Limpiar y crear el directorio remoto
-        //                         sshTransfer(
-        //                             execCommand: """
-        //                                 echo "--- Limpiando y creando directorio de la aplicación en el remoto ---"
-        //                                 # Eliminar el directorio si ya existe para asegurar una copia limpia
-        //                                 sudo -u satest rm -rf ${env.REMOTE_APP_DIR} || true
-        //                                 # Crear el nuevo directorio
-        //                                 sudo -u satest mkdir -p ${env.REMOTE_APP_DIR}
-        //                                 # Asegurar que el usuario de despliegue (satest) sea el propietario y tenga permisos
-        //                                 sudo -u satest chown ${env.DEPLOY_USER}:${env.DEPLOY_USER} ${env.REMOTE_APP_DIR}
-        //                                 sudo -u satest chmod 755 ${env.REMOTE_APP_DIR}
-        //                                 echo "Directorio remoto '${env.REMOTE_APP_DIR}' preparado."
-        //                             """
-        //                         ),
-        //                         // Paso 2: Copiar el código desde el workspace de Jenkins al servidor remoto
-        //                         sshTransfer(
-        //                             sourceFiles: '**',          // Copia todos los archivos y directorios del workspace de Jenkins
-        //                             removePrefix: '.',          // Elimina el prefijo '.' para que no cree un '.'-directorio
-        //                             remoteDirectory: env.REMOTE_APP_DIR, // El directorio de destino en el servidor remoto
-        //                             execCommand: """
-        //                                 echo "--- Código copiado al servidor remoto ---"
-        //                                 # El 'execCommand' se ejecuta DESPUÉS de la transferencia de archivos
-        //                                 # Puedes usarlo para verificar que los archivos están allí, si quieres
-        //                                 sudo -u satest ls -la ${env.REMOTE_APP_DIR}
-        //                                 echo "--- Fin de la copia de código ---"
-        //                             """
-        //                         )
-        //                     ]
-        //                 )
-        //             ])
-        //             echo "Código copiado exitosamente a '${env.REMOTE_APP_DIR}' en el servidor remoto."
-        //         }
-        //     }
-        // }
-
         stage('Prepare Remote Environment and Copy Code') {
             steps {
                 script {
@@ -81,27 +38,30 @@ pipeline {
                         sshPublisherDesc(
                             configName: env.SSH_SERVER_NAME,
                             transfers: [
-                                // Paso 1: Limpiar y crear el directorio remoto, y dar permisos a e06911 temporalmente
+                                // Paso 1: Limpiar y crear el directorio remoto
                                 sshTransfer(
                                     execCommand: """
                                         echo "--- Limpiando y creando directorio de la aplicación en el remoto ---"
-                                        sudo rm -rf ${env.REMOTE_APP_DIR} || true
-                                        sudo mkdir -p ${env.REMOTE_APP_DIR}
-                                        sudo chown e06911:e06911 ${env.REMOTE_APP_DIR}
-                                        sudo chmod 755 ${env.REMOTE_APP_DIR}
-                                        echo "Directorio remoto '${env.REMOTE_APP_DIR}' preparado para copia."
+                                        # Eliminar el directorio si ya existe para asegurar una copia limpia
+                                        sudo -u satest rm -rf ${env.REMOTE_APP_DIR} || true
+                                        # Crear el nuevo directorio
+                                        sudo -u satest mkdir -p ${env.REMOTE_APP_DIR}
+                                        # Asegurar que el usuario de despliegue (satest) sea el propietario y tenga permisos
+                                        sudo -u satest chown ${env.DEPLOY_USER}:${env.DEPLOY_USER} ${env.REMOTE_APP_DIR}
+                                        sudo -u satest chmod 755 ${env.REMOTE_APP_DIR}
+                                        echo "Directorio remoto '${env.REMOTE_APP_DIR}' preparado."
                                     """
                                 ),
                                 // Paso 2: Copiar el código desde el workspace de Jenkins al servidor remoto
                                 sshTransfer(
-                                    sourceFiles: '**',
-                                    removePrefix: '.',
-                                    remoteDirectory: env.REMOTE_APP_DIR,
+                                    sourceFiles: '**',          // Copia todos los archivos y directorios del workspace de Jenkins
+                                    removePrefix: '.',          // Elimina el prefijo '.' para que no cree un '.'-directorio
+                                    remoteDirectory: env.REMOTE_APP_DIR, // El directorio de destino en el servidor remoto
                                     execCommand: """
                                         echo "--- Código copiado al servidor remoto ---"
-                                        sudo chown -R satest:satest ${env.REMOTE_APP_DIR}
-                                        sudo chmod -R 755 ${env.REMOTE_APP_DIR}
-                                        ls -la ${env.REMOTE_APP_DIR}
+                                        # El 'execCommand' se ejecuta DESPUÉS de la transferencia de archivos
+                                        # Puedes usarlo para verificar que los archivos están allí, si quieres
+                                        sudo -u satest ls -la ${env.REMOTE_APP_DIR}
                                         echo "--- Fin de la copia de código ---"
                                     """
                                 )
