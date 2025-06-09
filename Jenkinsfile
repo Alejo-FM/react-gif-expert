@@ -85,7 +85,7 @@ pipeline {
                                     execCommand: """
                                         echo "--- Inicio de construcción de imagen Docker ---"
                                         # Cambiar al directorio donde se copió tu Dockerfile y el código fuente
-                                        cd ${env.REMOTE_APP_DIR} || exit 1 # Sale si no puede cambiar de directorio
+                                        sudo -u ${env.DEPLOY_USER} cd ${env.REMOTE_APP_DIR} || exit 1 # Sale si no puede cambiar de directorio
                                         
                                         # Ejecutar docker build como el usuario con acceso a Docker
                                         sudo -u ${env.DEPLOY_USER} docker build -t ${env.APP_NAME}:latest .
