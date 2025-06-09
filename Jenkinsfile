@@ -16,7 +16,7 @@ pipeline {
         DEPLOY_USER = 'satest'              // <--- ¡AJUSTA! El usuario en el servidor remoto que tiene acceso a Docker
 
         // Path de la aplicación en el servidor remoto. Será '/APP_NAME'
-        REMOTE_APP_DIR = "/${APP_NAME}"     // <--- ¡AJUSTA SI QUIERES OTRA RUTA BASE QUE NO SEA LA RAÍZ!
+        REMOTE_APP_DIR = "/home/satest/${APP_NAME}"     // <--- ¡AJUSTA SI QUIERES OTRA RUTA BASE QUE NO SEA LA RAÍZ!
                                             //        Ej: '/apps/react' si prefieres.
     }
 
