@@ -1,3 +1,8 @@
+# Stage 1: Build the React application
+# Utiliza una imagen Node.js ligera para la etapa de construcción.
+# Recomendamos una versión LTS de Alpine para imágenes más pequeñas.
+FROM node:20-alpine AS build-stage
+
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
 
@@ -6,11 +11,6 @@ ARG HTTPS_PROXY
 # que se ejecuten DESPUÉS de estas líneas.
 ENV HTTP_PROXY=$HTTP_PROXY
 ENV HTTPS_PROXY=$HTTPS_PROXY
-
-# Stage 1: Build the React application
-# Utiliza una imagen Node.js ligera para la etapa de construcción.
-# Recomendamos una versión LTS de Alpine para imágenes más pequeñas.
-FROM node:20-alpine AS build-stage
 
 # Establece el directorio de trabajo dentro del contenedor.
 WORKDIR /app
