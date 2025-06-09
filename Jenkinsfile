@@ -17,7 +17,6 @@ pipeline {
 
         // Path de la aplicación en el servidor remoto. Será '/APP_NAME'
         REMOTE_APP_DIR = "${APP_NAME}"     // <--- ¡AJUSTA SI QUIERES OTRA RUTA BASE QUE NO SEA LA RAÍZ!
-                                            //        Ej: '/apps/react' si prefieres.
     }
 
     // Define las etapas (stages) del pipeline.
@@ -77,20 +76,25 @@ pipeline {
             steps {
                 script {
                     echo "Construyendo la imagen Docker '${env.APP_NAME}:latest' en el servidor remoto '${env.SSH_SERVER_NAME}' como usuario '${env.DEPLOY_USER}'..."
-                    sshPublisher(publishers: [
-                        sshPublisherDesc(
-                            configName: env.SSH_SERVER_NAME,
-                            transfers: [
-                                sshTransfer(
-                                    execCommand: """
-                                        echo "--- Inicio de construcción de imagen Docker ---"
-                                        sudo -u ${env.DEPLOY_USER} docker build -t ${env.APP_NAME}:latest -f ${env.REMOTE_APP_DIR}/Dockerfile ${env.REMOTE_APP_DIR}
-                                        echo "--- Fin de construcción de imagen Docker ---"
-                                    """
-                                )
-                            ]
-                        )
-                    ])
+                    withCredentials([
+                        string(credentialsId: 'HTTP_PROXY_VALUE', variable: 'HTTP_PROXY'),
+                        string(credentialsId: 'HTTPS_PROXY_VALUE', variable: 'HTTPS_PROXY')
+                    ]) {
+                        sshPublisher(publishers: [
+                            sshPublisherDesc(
+                                configName: env.SSH_SERVER_NAME,
+                                transfers: [
+                                    sshTransfer(
+                                        execCommand: """
+                                            echo "--- Inicio de construcción de imagen Docker ---"
+                                            docker build --build-arg HTTP_PROXY=$HTTP_PROXY --build-arg HTTPS_PROXY=$HTTPS_PROXY -t ${env.APP_NAME}:latest -f ${env.REMOTE_APP_DIR}/Dockerfile ${env.REMOTE_APP_DIR}
+                                            echo "--- Fin de construcción de imagen Docker ---"
+                                        """
+                                    )
+                                ]
+                            )
+                        ])
+                    }
                     echo "Imagen Docker '${env.APP_NAME}:latest' construida en el servidor remoto."
                 }
             }
@@ -109,13 +113,13 @@ pipeline {
                                         echo "--- Inicio de despliegue de contenedor ---"
                                         # Detener y eliminar el contenedor antiguo si existe (|| true evita que el script falle)
                                         echo "Intentando detener contenedor antiguo '${env.APP_NAME}-container'..."
-                                        sudo -u ${env.DEPLOY_USER} docker stop ${env.APP_NAME}-container || true
+                                        docker stop ${env.APP_NAME}-container || true
                                         echo "Intentando eliminar contenedor antiguo '${env.APP_NAME}-container'..."
-                                        sudo -u ${env.DEPLOY_USER} docker rm ${env.APP_NAME}-container || true
+                                        docker rm ${env.APP_NAME}-container || true
                                         
                                         # Lanzar el nuevo contenedor con la imagen recién construida
                                         echo "Lanzando nuevo contenedor '${env.APP_NAME}-container'..."
-                                        sudo -u ${env.DEPLOY_USER} docker run -d --name ${env.APP_NAME}-container -p ${env.HOST_PORT}:${env.CONTAINER_PORT} ${env.APP_NAME}:latest
+                                        docker run -d --name ${env.APP_NAME}-container -p ${env.HOST_PORT}:${env.CONTAINER_PORT} ${env.APP_NAME}:latest
                                         echo "--- Contenedor nuevo levantado ---"
                                     """
                                 )
