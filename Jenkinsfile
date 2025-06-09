@@ -16,7 +16,7 @@ pipeline {
         DEPLOY_USER = 'satest'              // <--- ¡AJUSTA! El usuario en el servidor remoto que tiene acceso a Docker
 
         // Path de la aplicación en el servidor remoto. Será '/APP_NAME'
-        REMOTE_APP_DIR = "/${APP_NAME}"     // <--- ¡AJUSTA SI QUIERES OTRA RUTA BASE QUE NO SEA LA RAÍZ!
+        REMOTE_APP_DIR = "${APP_NAME}"     // <--- ¡AJUSTA SI QUIERES OTRA RUTA BASE QUE NO SEA LA RAÍZ!
                                             //        Ej: '/apps/react' si prefieres.
     }
 
@@ -43,12 +43,12 @@ pipeline {
                                     execCommand: """
                                         echo "--- Limpiando y creando directorio de la aplicación en el remoto ---"
                                         # Eliminar el directorio si ya existe para asegurar una copia limpia
-                                        sudo -u satest rm -rf ${env.REMOTE_APP_DIR} || true
+                                        rm -rf ${env.REMOTE_APP_DIR} || true
                                         # Crear el nuevo directorio
-                                        sudo -u satest mkdir -p ${env.REMOTE_APP_DIR}
+                                        mkdir -p ${env.REMOTE_APP_DIR}
                                         # Asegurar que el usuario de despliegue (satest) sea el propietario y tenga permisos
-                                        sudo -u satest chown ${env.DEPLOY_USER}:${env.DEPLOY_USER} ${env.REMOTE_APP_DIR}
-                                        sudo -u satest chmod 755 ${env.REMOTE_APP_DIR}
+                                        chown ${env.DEPLOY_USER}:${env.DEPLOY_USER} ${env.REMOTE_APP_DIR}
+                                        chmod 755 ${env.REMOTE_APP_DIR}
                                         echo "Directorio remoto '${env.REMOTE_APP_DIR}' preparado."
                                     """
                                 ),
@@ -61,7 +61,7 @@ pipeline {
                                         echo "--- Código copiado al servidor remoto ---"
                                         # El 'execCommand' se ejecuta DESPUÉS de la transferencia de archivos
                                         # Puedes usarlo para verificar que los archivos están allí, si quieres
-                                        sudo -u satest ls -la ${env.REMOTE_APP_DIR}
+                                        ls -la ${env.REMOTE_APP_DIR}
                                         echo "--- Fin de la copia de código ---"
                                     """
                                 )
@@ -110,4 +110,3 @@ pipeline {
         }
     }
 }
-
