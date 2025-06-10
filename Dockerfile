@@ -29,7 +29,7 @@ RUN npm run build
 
 # Stage 2: Serve the React application with Nginx
 # Utiliza una imagen Nginx muy ligera para servir los archivos estáticos.
-FROM nginx:alpine AS production-stage
+FROM nginx:latest AS production-stage
 
 # Copia la configuración personalizada de Nginx.
 COPY nginx.conf /etc/nginx/conf.d/default.conf
