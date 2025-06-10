@@ -10,7 +10,6 @@ pipeline {
         CONTAINER_PORT = '80'               // <--- ¡AJUSTA! Puerto interno del contenedor Docker de tu app
         HOST_PORT = '8081'                  // <--- ¡AJUSTA! Puerto del servidor host que se mapeará al CONTAINER_PORT
                                             //        (ej: si accedes a tu app por http://tu_servidor:8081)
-
         // Variables para la conexión SSH remota (a través del plugin Publish Over SSH)
         SSH_SERVER_NAME = 'saserver'        // <--- ¡AJUSTA! Nombre del servidor configurado en Publish over SSH
         DEPLOY_USER = 'satest'              // <--- ¡AJUSTA! El usuario en el servidor remoto que tiene acceso a Docker
