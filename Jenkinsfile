@@ -86,7 +86,7 @@ pipeline {
                                     sshTransfer(
                                         execCommand: """
                                             echo "--- Inicio de construcción de imagen Docker ---"
-                                            docker build --build-arg HTTP_PROXY=$HTTP_PROXY --build-arg HTTPS_PROXY=$HTTPS_PROXY -t ${env.APP_NAME}:latest -f ${env.REMOTE_APP_DIR}/Dockerfile ${env.REMOTE_APP_DIR}
+                                            docker build --no-cache --build-arg HTTP_PROXY=$HTTP_PROXY --build-arg HTTPS_PROXY=$HTTPS_PROXY -t ${env.APP_NAME}:latest -f ${env.REMOTE_APP_DIR}/Dockerfile ${env.REMOTE_APP_DIR}
                                             echo "--- Fin de construcción de imagen Docker ---"
                                         """
                                     )
